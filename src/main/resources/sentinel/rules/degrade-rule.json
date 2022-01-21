@@ -1,0 +1,11 @@
+[
+  {
+    "count": 3.0,
+    "grade": 2,
+    "limitApp": "default",
+    "minRequestAmount": 5,
+    "resource": "/degrade",
+    "rtSlowRequestAmount": 5,
+    "timeWindow": 10
+  }
+]

@@ -1,0 +1,90 @@
+server:
+  port: 9000
+  max-http-header-size: 10MB
+spring:
+  application:
+    name: gateway-ratelimit-sample
+  redis:
+    host: 192.168.101.4
+    password:
+    port: 6379
+    database: 0
+    timeout: 3000
+
+  cloud:
+    gateway:
+      httpserver:
+        wiretap: true
+      httpclient:
+        wiretap: true
+      default-filters:
+        - name: IpBlackList
+          args:
+            blacklist:
+              - "192.168.31.19"
+              - "127.0.0.1"
+
+      routes:
+        - id: order-service
+          uri: http://localhost:9000
+          predicates:
+            - Path=/orders
+          filters:
+            - SetPath=/orders/list
+        - id: product-service
+          uri: http://localhost:9000
+          predicates:
+            - Path=/products
+          filters:
+            - SetPath=/products/list
+        - id: user-service
+          uri: http://localhost:9000
+          predicates:
+            - Path=/users
+          filters:
+            - SetPath=/users/list
+        - id: account-service
+          uri: http://localhost:9000
+          predicates:
+            - Path=/accounts
+          filters:
+            - SetPath=/accounts/list
+        - id: httpbin-service
+          uri: http://httpbin.org
+          predicates:
+            - Path=/**
+
+    sentinel:
+      eager: true
+      filter:
+        enabled: true
+      transport:
+        dashboard: 127.0.0.1:8080
+#      scg:
+#        order: -100
+#        fallback:
+#          mode: response
+#          response-status: 429
+#          response-body: '{"code":429,"msg":"请求太快了，你被限流了。。。"}'
+#          content-type: application/json
+
+logging:
+  level:
+    org.springframework.cloud.gateway: trace
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    gateway:
+      enabled: true
+
+resttemplate:
+  sentinel:
+    enabled: true
+
+feign:
+  sentinel:
+    enabled: true

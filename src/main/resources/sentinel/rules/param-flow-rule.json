@@ -1,0 +1,37 @@
+[
+  {
+    "burstCount": 0,
+    "clusterConfig": {
+      "fallbackToLocalWhenFail": true,
+      "sampleCount": 10,
+      "thresholdType": 0,
+      "windowIntervalMs": 1000
+    },
+    "clusterMode": false,
+    "controlBehavior": 0,
+    "count": 100.0,
+    "durationInSec": 10,
+    "grade": 1,
+    "limitApp": "default",
+    "maxQueueingTimeMs": 0,
+    "paramFlowItemList": [
+      {
+        "classType": "java.lang.String",
+        "count": 2,
+        "object": "123"
+      },
+      {
+        "classType": "java.lang.String",
+        "count": 3,
+        "object": "456"
+      },
+      {
+        "classType": "java.lang.String",
+        "count": 4,
+        "object": "789"
+      }
+    ],
+    "paramIdx": 0,
+    "resource": "hot"
+  }
+]
