@@ -1,17 +1,22 @@
 package com.anchnet.gateway.controller;
 
-import com.alibaba.csp.sentinel.annotation.SentinelResource;
-import com.alibaba.csp.sentinel.slots.block.BlockException;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.StringUtils;
+import com.anchnet.gateway.utils.Bucket4jUtil;
+import io.github.bucket4j.Bucket;
+import org.springframework.boot.actuate.metrics.MetricsEndpoint;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-@Slf4j
+import javax.annotation.Resource;
+import java.util.Objects;
+
 @RestController
 public class WebFluxController {
+
+    private static Bucket bucket = Bucket4jUtil.getBucket();
 
     @GetMapping("/orders/list")
     public Mono<String> orders() {
@@ -33,57 +38,31 @@ public class WebFluxController {
         return Mono.just("accounts list");
     }
 
-    /**
-     * 流量控制
-     *
-     * @return
-     */
-    @GetMapping("/qps")
-    public Mono<String> flow() {
-        return Mono.just("qps流量控制");
-    }
-
-    /**
-     * 服务降级
-     *
-     * @param name
-     * @return
-     */
-    @GetMapping(value = "/degrade")
-    public Mono<String> degrade(@RequestParam(required = false) String name) {
-        if (StringUtils.isEmpty(name)) {
-            throw new IllegalArgumentException("name不能为空");
+    @GetMapping("/try_bucket4j")
+    public Mono<String> get(ServerWebExchange exchange) {
+        if (bucket.tryConsume(1)) {
+            return Mono.just("Hello,Bucket4j");
+        } else {
+            ServerHttpResponse response = exchange.getResponse();
+            response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
+            return Mono.just(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase());
         }
-        return Mono.just("degrade:" + name);
     }
 
-    /**
-     * 热点参数限流
-     * <p>
-     * 注意:
-     * 热点参数限流必须加@SentinelResource注解，其资源值和@SentinelResource注解中value属性的值保持一致;
-     * 热点参数限流方法声明必须抛出BlockException异常，否则全局异常捕获不到
-     *
-     * @param productId
-     * @return
-     */
-    @GetMapping(value = "/hot")
-    @SentinelResource(value = "hot")
-    public Mono<String> hot(@RequestParam("productId") String productId) throws BlockException {
-        return Mono.just("productId:" + productId);
-    }
+    @Resource
+    private MetricsEndpoint metricsEndpoint;
 
-    /**
-     * 授权规则
-     * <p>
-     * SentinelGatewayConfig中的setRequestOriginParser会从请求头或请求参数中拦截origin的值，根据该值进行白名单或黑名单处理。 若获取不到origin参数的值默认为远程IP。具体参考@com.anchnet.gateway.config.SentinelGatewayConfig
-     *
-     * @param origin
-     * @return
-     */
-    @GetMapping(value = "/auth")
-    public Mono<String> auth(@RequestParam("origin") String origin) {
-        return Mono.just("origin:" + origin);
+    @GetMapping("/metrics/cpu-usage")
+    public Mono<Double> cpu_usage() {
+        Double systemCpuUsage = metricsEndpoint.metric("system.cpu.usage", null)
+                .getMeasurements()
+                .stream()
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(MetricsEndpoint.Sample::getValue)
+                .filter(Double::isFinite)
+                .orElse(0.0D);
+        return Mono.just(systemCpuUsage);
     }
 
 }

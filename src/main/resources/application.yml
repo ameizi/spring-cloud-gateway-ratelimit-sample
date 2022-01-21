@@ -1,28 +1,24 @@
 server:
   port: 9000
-  max-http-header-size: 10MB
 spring:
   application:
-    name: gateway-ratelimit-sample
-  redis:
-    host: 192.168.101.4
-    password:
-    port: 6379
-    database: 0
-    timeout: 3000
-
+    name: gateway
   cloud:
     gateway:
-      httpserver:
-        wiretap: true
-      httpclient:
-        wiretap: true
       default-filters:
+        # IP黑名单
         - name: IpBlackList
           args:
             blacklist:
               - "192.168.31.19"
               - "127.0.0.1"
+        # 自定义限流
+        - name: MyRequestRateLimiter
+          args:
+            key-resolver: "#{@uriKeyResolver}"
+            redis-rate-limiter.replenishRate: 1
+            redis-rate-limiter.burstCapacity: 1
+            redis-rate-limiter.requestedTokens: 1
 
       routes:
         - id: order-service
@@ -53,24 +49,28 @@ spring:
           uri: http://httpbin.org
           predicates:
             - Path=/**
+          filters:
+            - AddRequestParameter=color, blue
+            - AddRequestHeader=X-Request-Red, Blue
+            - AddResponseHeader=X-Response-Red, Blue
+      #            - name: MyRequestRateLimiter
+      #              args:
+      #                # 使用SpEL表达式从Spring容器中获取Bean对象
+      #                key-resolver: '#{@uriKeyResolver}'
+      #                # 令牌桶每秒填充平均速率
+      #                redis-rate-limiter.replenishRate: 1
+      #                # 令牌桶的上限
+      #                redis-rate-limiter.burstCapacity: 1
+      #                # 每次请求消费一个令牌
+      #                redis-rate-limiter.requestedTokens: 1
 
-    sentinel:
-      eager: true
-      filter:
-        enabled: true
-      transport:
-        dashboard: 127.0.0.1:8080
-#      scg:
-#        order: -100
-#        fallback:
-#          mode: response
-#          response-status: 429
-#          response-body: '{"code":429,"msg":"请求太快了，你被限流了。。。"}'
-#          content-type: application/json
+  redis:
+    host: 192.168.101.4
+    port: 6379
 
 logging:
   level:
-    org.springframework.cloud.gateway: trace
+    org.springframework.cloud.gateway: debug
 
 management:
   endpoints:
@@ -80,11 +80,3 @@ management:
   endpoint:
     gateway:
       enabled: true
-
-resttemplate:
-  sentinel:
-    enabled: true
-
-feign:
-  sentinel:
-    enabled: true

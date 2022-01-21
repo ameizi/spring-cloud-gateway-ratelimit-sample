@@ -1,4 +1,4 @@
-package com.anchnet.gateway;
+package com.anchnet.gateway.filter.ratelimit;
 
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * IP黑名单过滤
+ * IP黑名单过滤器
  */
 @Slf4j
 @Component
@@ -35,25 +35,10 @@ public class IpBlackListGatewayFilterFactory extends AbstractGatewayFilterFactor
         return (exchange, chain) -> {
             String ipAddress = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
             if (config.blacklist.contains(ipAddress)) {
-                return process(exchange);
+                return respJson(exchange);
             }
             return chain.filter(exchange);
         };
-    }
-
-    private Mono<Void> process(ServerWebExchange exchange) {
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.FORBIDDEN);
-        JSONObject jsonObject = new JSONObject()
-                .fluentPut("code", HttpStatus.FORBIDDEN.value())
-                .fluentPut("msg", "IP黑名单，拒绝访问。。。")
-                .fluentPut("ip", exchange.getRequest().getRemoteAddress().getAddress().getHostAddress())
-                .fluentPut("data", null)
-                .fluentPut("time", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(LocalDateTime.now()));
-        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-        DataBuffer wrap = response.bufferFactory().wrap(jsonObject.toJSONString().getBytes(StandardCharsets.UTF_8));
-        log.info("IP黑名单，拒绝访问。。。");
-        return response.writeWith(Mono.just(wrap));
     }
 
     public static class Config {
@@ -67,5 +52,20 @@ public class IpBlackListGatewayFilterFactory extends AbstractGatewayFilterFactor
         public void setBlacklist(Set<String> blacklist) {
             this.blacklist = blacklist;
         }
+    }
+
+    private Mono<Void> respJson(ServerWebExchange exchange) {
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(HttpStatus.FORBIDDEN);
+        JSONObject jsonObject = new JSONObject()
+                .fluentPut("code", HttpStatus.FORBIDDEN.value())
+                .fluentPut("msg", "IP黑名单，拒绝访问。。。")
+                .fluentPut("ip", exchange.getRequest().getRemoteAddress().getAddress().getHostAddress())
+                .fluentPut("data", null)
+                .fluentPut("time", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(LocalDateTime.now()));
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        DataBuffer wrap = response.bufferFactory().wrap(jsonObject.toJSONString().getBytes(StandardCharsets.UTF_8));
+        log.info("IP黑名单，拒绝访问。。。");
+        return response.writeWith(Mono.just(wrap));
     }
 }
