@@ -1,5 +1,9 @@
 package com.anchnet.gateway.config;
 
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiDefinition;
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.GatewayApiDefinitionManager;
+import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
+import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.config.SentinelConfig;
 import com.alibaba.csp.sentinel.datasource.Converter;
 import com.alibaba.csp.sentinel.datasource.ReadableDataSource;
@@ -24,6 +28,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -42,40 +47,52 @@ public class RedisDataSourceConfig implements ApplicationRunner {
     public String redisPass;
 
     /**
+     * Gateway ApiDefinition
+     */
+    public static final String GATEWAY_API_DEFINITION = "gateway_sentinel_api_definition";
+    public static final String GATEWAY_API_DEFINITION_CHANNEL = "gateway_sentinel_api_definition_channel";
+
+    /**
+     * Gateway限流规则key前缀
+     */
+    public static final String GATEWAY_RULE_FLOW = "gateway_sentinel_rule_flow";
+    public static final String GATEWAY_RULE_FLOW_CHANNEL = "gateway_sentinel_rule_flow_channel";
+
+    /**
      * 限流规则key前缀
      */
-    public final String RULE_FLOW = "sentinel_rule_flow";
-    public final String RULE_FLOW_CHANNEL = "sentinel_rule_flow_channel";
+    public static final String RULE_FLOW = "sentinel_rule_flow";
+    public static final String RULE_FLOW_CHANNEL = "sentinel_rule_flow_channel";
 
     /**
      * 降级规则key前缀
      */
-    public final String RULE_DEGRADE = "sentinel_rule_degrade";
-    public final String RULE_DEGRADE_CHANNEL = "sentinel_rule_degrade_channel";
+    public static final String RULE_DEGRADE = "sentinel_rule_degrade";
+    public static final String RULE_DEGRADE_CHANNEL = "sentinel_rule_degrade_channel";
 
     /**
      * 系统规则key前缀
      */
-    public final String RULE_SYSTEM = "sentinel_rule_system";
-    public final String RULE_SYSTEM_CHANNEL = "sentinel_rule_system_channel";
+    public static final String RULE_SYSTEM = "sentinel_rule_system";
+    public static final String RULE_SYSTEM_CHANNEL = "sentinel_rule_system_channel";
 
     /**
      * 参数热点规则key前缀
      */
     public static final String RULE_PARAM = "sentinel_rule_param";
-    public final String RULE_PARAM_CHANNEL = "sentinel_rule_param_channel";
+    public static final String RULE_PARAM_CHANNEL = "sentinel_rule_param_channel";
 
     /**
      * 授权规则key前缀
      */
     public static final String RULE_AUTHORITY = "sentinel_rule_authority";
-    public final String RULE_AUTHORITY_CHANNEL = "sentinel_rule_authority_channel";
+    public static final String RULE_AUTHORITY_CHANNEL = "sentinel_rule_authority_channel";
 
     /**
      * 集群限流key前缀
      */
-    public final String RULE_CLUSTER = "sentinel_cluster_rule_flow";
-    public final String RULE_CLUSTER_MAP = "sentinel_cluster_rule_flow_map";
+    public static final String RULE_CLUSTER = "sentinel_cluster_rule_flow";
+    public static final String RULE_CLUSTER_MAP = "sentinel_cluster_rule_flow_map";
 
     public static final String RULE_CLUSTER_CLIENT_CONFIG = "sentinel_cluster_client_config";
     public static final String RULE_CLUSTER_CLIENT_CONFIG_CHANNEL = "sentinel_cluster_client_config_channel";
@@ -85,6 +102,18 @@ public class RedisDataSourceConfig implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         log.info(">>>>>>>>>执行sentinel规则初始化 start。。。");
         RedisConnectionConfig config = RedisConnectionConfig.builder().withDatabase(database).withHost(redisHost).withPort(redisPort).withPassword(redisPass).build();
+
+        // Gateway ApiDefinition
+        Converter<String, Set<ApiDefinition>> parserGatewayApiDefinition = source -> JSON.parseObject(source, new TypeReference<Set<ApiDefinition>>() {
+        });
+        ReadableDataSource<String, Set<ApiDefinition>> redisDataSourceGatewayApiDefinition = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_API_DEFINITION, GATEWAY_API_DEFINITION_CHANNEL, parserGatewayApiDefinition);
+        GatewayApiDefinitionManager.register2Property(redisDataSourceGatewayApiDefinition.getProperty());
+
+        // Gateway流控规则
+        Converter<String, Set<GatewayFlowRule>> parserGatewayFlow = source -> JSON.parseObject(source, new TypeReference<Set<GatewayFlowRule>>() {
+        });
+        ReadableDataSource<String, Set<GatewayFlowRule>> redisDataSourceGatewayFlow = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_RULE_FLOW, GATEWAY_RULE_FLOW_CHANNEL, parserGatewayFlow);
+        GatewayRuleManager.register2Property(redisDataSourceGatewayFlow.getProperty());
 
         // 流控规则
         Converter<String, List<FlowRule>> parserFlow = source -> JSON.parseObject(source, new TypeReference<List<FlowRule>>() {
@@ -115,7 +144,6 @@ public class RedisDataSourceConfig implements ApplicationRunner {
         });
         ReadableDataSource<String, List<AuthorityRule>> redisDataSourceAuthority = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_AUTHORITY, RULE_AUTHORITY_CHANNEL, parserAuthority);
         AuthorityRuleManager.register2Property(redisDataSourceAuthority.getProperty());
-
         log.info(">>>>>>>>>执行sentinel规则初始化 end。。。");
     }
 
