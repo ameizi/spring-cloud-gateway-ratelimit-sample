@@ -58,7 +58,7 @@ spring:
       eager: true
       filter:
         # 运行在网关模式需设置为false
-        enabled: false
+        enabled: true
       transport:
         dashboard: 127.0.0.1:8080
 #      scg:

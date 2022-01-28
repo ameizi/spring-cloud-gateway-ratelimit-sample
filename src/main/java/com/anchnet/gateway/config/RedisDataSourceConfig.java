@@ -1,6 +1,8 @@
 package com.anchnet.gateway.config;
 
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiDefinition;
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPathPredicateItem;
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPredicateItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.GatewayApiDefinitionManager;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
@@ -20,6 +22,8 @@ import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRuleManager;
 import com.alibaba.csp.sentinel.slots.system.SystemRule;
 import com.alibaba.csp.sentinel.slots.system.SystemRuleManager;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +31,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -104,8 +109,7 @@ public class RedisDataSourceConfig implements ApplicationRunner {
         RedisConnectionConfig config = RedisConnectionConfig.builder().withDatabase(database).withHost(redisHost).withPort(redisPort).withPassword(redisPass).build();
 
         // Gateway ApiDefinition
-        Converter<String, Set<ApiDefinition>> parserGatewayApiDefinition = source -> JSON.parseObject(source, new TypeReference<Set<ApiDefinition>>() {
-        });
+        Converter<String, Set<ApiDefinition>> parserGatewayApiDefinition = this::parseJson;
         ReadableDataSource<String, Set<ApiDefinition>> redisDataSourceGatewayApiDefinition = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_API_DEFINITION, GATEWAY_API_DEFINITION_CHANNEL, parserGatewayApiDefinition);
         GatewayApiDefinitionManager.register2Property(redisDataSourceGatewayApiDefinition.getProperty());
 
@@ -145,6 +149,23 @@ public class RedisDataSourceConfig implements ApplicationRunner {
         ReadableDataSource<String, List<AuthorityRule>> redisDataSourceAuthority = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_AUTHORITY, RULE_AUTHORITY_CHANNEL, parserAuthority);
         AuthorityRuleManager.register2Property(redisDataSourceAuthority.getProperty());
         log.info(">>>>>>>>>执行sentinel规则初始化 end。。。");
+    }
+
+    private Set<ApiDefinition> parseJson(String data) {
+        Set<ApiDefinition> apiDefinitions = new HashSet<>();
+        JSONArray array = JSON.parseArray(data);
+        for (Object obj : array) {
+            JSONObject o = (JSONObject) obj;
+            ApiDefinition apiDefinition = new ApiDefinition((o.getString("apiName")));
+            Set<ApiPredicateItem> predicateItems = new HashSet<>();
+            JSONArray itemArray = o.getJSONArray("predicateItems");
+            if (itemArray != null) {
+                predicateItems.addAll(itemArray.toJavaList(ApiPathPredicateItem.class));
+            }
+            apiDefinition.setPredicateItems(predicateItems);
+            apiDefinitions.add(apiDefinition);
+        }
+        return apiDefinitions;
     }
 
 }
