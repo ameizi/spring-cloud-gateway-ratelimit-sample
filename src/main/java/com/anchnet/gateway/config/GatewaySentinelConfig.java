@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.util.List;
+import java.util.Objects;
 
 @Configuration
 public class GatewaySentinelConfig {
@@ -43,7 +44,7 @@ public class GatewaySentinelConfig {
         } else {
             origin = origins.get(0);
         }
-        return !StringUtils.isEmpty(origin) ? origin : exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+        return !StringUtils.isEmpty(origin) ? origin : Objects.requireNonNull(exchange.getRequest().getRemoteAddress()).getAddress().getHostAddress();
     }
 
 }

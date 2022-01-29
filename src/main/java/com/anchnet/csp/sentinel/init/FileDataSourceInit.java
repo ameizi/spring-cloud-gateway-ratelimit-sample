@@ -1,7 +1,16 @@
 package com.anchnet.csp.sentinel.init;
 
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiDefinition;
+import com.alibaba.csp.sentinel.adapter.gateway.common.api.GatewayApiDefinitionManager;
+import com.alibaba.csp.sentinel.adapter.gateway.common.command.UpdateGatewayApiDefinitionGroupCommandHandler;
+import com.alibaba.csp.sentinel.adapter.gateway.common.command.UpdateGatewayRuleCommandHandler;
+import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
+import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.command.handler.ModifyParamFlowRulesCommandHandler;
-import com.alibaba.csp.sentinel.datasource.*;
+import com.alibaba.csp.sentinel.datasource.FileRefreshableDataSource;
+import com.alibaba.csp.sentinel.datasource.FileWritableDataSource;
+import com.alibaba.csp.sentinel.datasource.ReadableDataSource;
+import com.alibaba.csp.sentinel.datasource.WritableDataSource;
 import com.alibaba.csp.sentinel.init.InitFunc;
 import com.alibaba.csp.sentinel.slots.block.authority.AuthorityRule;
 import com.alibaba.csp.sentinel.slots.block.authority.AuthorityRuleManager;
@@ -15,20 +24,23 @@ import com.alibaba.csp.sentinel.slots.system.SystemRule;
 import com.alibaba.csp.sentinel.slots.system.SystemRuleManager;
 import com.alibaba.csp.sentinel.transport.util.WritableDataSourceRegistry;
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.TypeReference;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 基于文件拉模式规则持久化
  */
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class FileDataSourceInit implements InitFunc {
 
     @Override
     public void init() throws Exception {
         String ruleDir = System.getProperty("user.dir") + "/src/main/resources/sentinel/rules";
+        String apiDefinitionRulePath = ruleDir + "/gateway-api-definition.json";
+        String gatewayFlowRulePath = ruleDir + "/gateway-flow-rule.json";
         String flowRulePath = ruleDir + "/flow-rule.json";
         String degradeRulePath = ruleDir + "/degrade-rule.json";
         String systemRulePath = ruleDir + "/system-rule.json";
@@ -36,16 +48,42 @@ public class FileDataSourceInit implements InitFunc {
         String paramFlowRulePath = ruleDir + "/param-flow-rule.json";
 
         this.mkdirIfNotExits(ruleDir);
+        this.createFileIfNotExits(apiDefinitionRulePath);
+        this.createFileIfNotExits(gatewayFlowRulePath);
         this.createFileIfNotExits(flowRulePath);
         this.createFileIfNotExits(degradeRulePath);
         this.createFileIfNotExits(systemRulePath);
         this.createFileIfNotExits(authorityRulePath);
         this.createFileIfNotExits(paramFlowRulePath);
 
+        // Gateway ApiDefinition
+        ReadableDataSource<String, Set<ApiDefinition>> apiDefinitionRuleRDS = new FileRefreshableDataSource<>(
+                apiDefinitionRulePath,
+                ConverterUtil.apiDefinitionRuleListParser
+        );
+        GatewayApiDefinitionManager.register2Property(apiDefinitionRuleRDS.getProperty());
+        WritableDataSource<Set<ApiDefinition>> apiDefinitionRuleWDS = new FileWritableDataSource<>(
+                apiDefinitionRulePath,
+                this::encodeJson
+        );
+        UpdateGatewayApiDefinitionGroupCommandHandler.setWritableDataSource(apiDefinitionRuleWDS);
+
+        // Gateway流控规则
+        ReadableDataSource<String, Set<GatewayFlowRule>> gatewayFlowRuleRDS = new FileRefreshableDataSource<>(
+                gatewayFlowRulePath,
+                ConverterUtil.gatewayFlowRuleListParser
+        );
+        GatewayRuleManager.register2Property(gatewayFlowRuleRDS.getProperty());
+        WritableDataSource<Set<GatewayFlowRule>> gatewayFlowRuleWDS = new FileWritableDataSource<>(
+                gatewayFlowRulePath,
+                this::encodeJson
+        );
+        UpdateGatewayRuleCommandHandler.setWritableDataSource(gatewayFlowRuleWDS);
+
         // 流控规则
         ReadableDataSource<String, List<FlowRule>> flowRuleRDS = new FileRefreshableDataSource<>(
                 flowRulePath,
-                flowRuleListParser
+                ConverterUtil.flowRuleListParser
         );
         // 将可读数据源注册至FlowRuleManager
         // 这样当规则文件发生变化时，就会更新规则到内存
@@ -61,7 +99,7 @@ public class FileDataSourceInit implements InitFunc {
         // 降级规则
         ReadableDataSource<String, List<DegradeRule>> degradeRuleRDS = new FileRefreshableDataSource<>(
                 degradeRulePath,
-                degradeRuleListParser
+                ConverterUtil.degradeRuleListParser
         );
         DegradeRuleManager.register2Property(degradeRuleRDS.getProperty());
         WritableDataSource<List<DegradeRule>> degradeRuleWDS = new FileWritableDataSource<>(
@@ -73,7 +111,7 @@ public class FileDataSourceInit implements InitFunc {
         // 系统规则
         ReadableDataSource<String, List<SystemRule>> systemRuleRDS = new FileRefreshableDataSource<>(
                 systemRulePath,
-                systemRuleListParser
+                ConverterUtil.systemRuleListParser
         );
         SystemRuleManager.register2Property(systemRuleRDS.getProperty());
         WritableDataSource<List<SystemRule>> systemRuleWDS = new FileWritableDataSource<>(
@@ -85,7 +123,7 @@ public class FileDataSourceInit implements InitFunc {
         // 授权规则
         ReadableDataSource<String, List<AuthorityRule>> authorityRuleRDS = new FileRefreshableDataSource<>(
                 authorityRulePath,
-                authorityRuleListParser
+                ConverterUtil.authorityRuleListParser
         );
         AuthorityRuleManager.register2Property(authorityRuleRDS.getProperty());
         WritableDataSource<List<AuthorityRule>> authorityRuleWDS = new FileWritableDataSource<>(
@@ -97,7 +135,7 @@ public class FileDataSourceInit implements InitFunc {
         // 热点参数规则
         ReadableDataSource<String, List<ParamFlowRule>> paramFlowRuleRDS = new FileRefreshableDataSource<>(
                 paramFlowRulePath,
-                paramFlowRuleListParser
+                ConverterUtil.paramFlowRuleListParser
         );
         ParamFlowRuleManager.register2Property(paramFlowRuleRDS.getProperty());
         WritableDataSource<List<ParamFlowRule>> paramFlowRuleWDS = new FileWritableDataSource<>(
@@ -106,34 +144,6 @@ public class FileDataSourceInit implements InitFunc {
         );
         ModifyParamFlowRulesCommandHandler.setWritableDataSource(paramFlowRuleWDS);
     }
-
-    private Converter<String, List<FlowRule>> flowRuleListParser = source -> JSON.parseObject(
-            source,
-            new TypeReference<List<FlowRule>>() {
-            }
-    );
-    private Converter<String, List<DegradeRule>> degradeRuleListParser = source -> JSON.parseObject(
-            source,
-            new TypeReference<List<DegradeRule>>() {
-            }
-    );
-    private Converter<String, List<SystemRule>> systemRuleListParser = source -> JSON.parseObject(
-            source,
-            new TypeReference<List<SystemRule>>() {
-            }
-    );
-
-    private Converter<String, List<AuthorityRule>> authorityRuleListParser = source -> JSON.parseObject(
-            source,
-            new TypeReference<List<AuthorityRule>>() {
-            }
-    );
-
-    private Converter<String, List<ParamFlowRule>> paramFlowRuleListParser = source -> JSON.parseObject(
-            source,
-            new TypeReference<List<ParamFlowRule>>() {
-            }
-    );
 
     private void mkdirIfNotExits(String filePath) throws IOException {
         File file = new File(filePath);

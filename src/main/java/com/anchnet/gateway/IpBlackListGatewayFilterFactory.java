@@ -1,6 +1,7 @@
 package com.anchnet.gateway;
 
 import com.alibaba.fastjson.JSONObject;
+import com.anchnet.utils.AddressUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -33,8 +35,11 @@ public class IpBlackListGatewayFilterFactory extends AbstractGatewayFilterFactor
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
-            String ipAddress = exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
-            if (config.blacklist.contains(ipAddress)) {
+            String clientIP = AddressUtils.getClientIP(exchange.getRequest());
+            String realAddressByIP = AddressUtils.getRealAddressByIP(clientIP);
+            String remoteAddress = Objects.requireNonNull(exchange.getRequest().getRemoteAddress()).getAddress().getHostAddress();
+            log.info("clientIP:{},realAddressByIP:{},remoteAddress:{}", clientIP, realAddressByIP, remoteAddress);
+            if (config.blacklist.contains(remoteAddress)) {
                 return process(exchange);
             }
             return chain.filter(exchange);
@@ -47,7 +52,7 @@ public class IpBlackListGatewayFilterFactory extends AbstractGatewayFilterFactor
         JSONObject jsonObject = new JSONObject()
                 .fluentPut("code", HttpStatus.FORBIDDEN.value())
                 .fluentPut("msg", "IP黑名单，拒绝访问。。。")
-                .fluentPut("ip", exchange.getRequest().getRemoteAddress().getAddress().getHostAddress())
+                .fluentPut("ip", Objects.requireNonNull(exchange.getRequest().getRemoteAddress()).getAddress().getHostAddress())
                 .fluentPut("data", null)
                 .fluentPut("time", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(LocalDateTime.now()));
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);

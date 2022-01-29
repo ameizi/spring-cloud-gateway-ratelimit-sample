@@ -1,13 +1,10 @@
-package com.anchnet.gateway.config;
+package com.anchnet.csp.sentinel.init;
 
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiDefinition;
-import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPathPredicateItem;
-import com.alibaba.csp.sentinel.adapter.gateway.common.api.ApiPredicateItem;
 import com.alibaba.csp.sentinel.adapter.gateway.common.api.GatewayApiDefinitionManager;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule;
 import com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager;
 import com.alibaba.csp.sentinel.config.SentinelConfig;
-import com.alibaba.csp.sentinel.datasource.Converter;
 import com.alibaba.csp.sentinel.datasource.ReadableDataSource;
 import com.alibaba.csp.sentinel.datasource.redis.RedisDataSource;
 import com.alibaba.csp.sentinel.datasource.redis.config.RedisConnectionConfig;
@@ -21,23 +18,18 @@ import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRule;
 import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRuleManager;
 import com.alibaba.csp.sentinel.slots.system.SystemRule;
 import com.alibaba.csp.sentinel.slots.system.SystemRuleManager;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.TypeReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Slf4j
 @Component
-public class RedisDataSourceConfig implements ApplicationRunner {
+public class RedisDataSourceInit implements ApplicationRunner {
 
     @Value("${spring.redis.host}")
     public String redisHost;
@@ -104,68 +96,38 @@ public class RedisDataSourceConfig implements ApplicationRunner {
 
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
         log.info(">>>>>>>>>执行sentinel规则初始化 start。。。");
         RedisConnectionConfig config = RedisConnectionConfig.builder().withDatabase(database).withHost(redisHost).withPort(redisPort).withPassword(redisPass).build();
 
         // Gateway ApiDefinition
-        Converter<String, Set<ApiDefinition>> parserGatewayApiDefinition = this::parseJson;
-        ReadableDataSource<String, Set<ApiDefinition>> redisDataSourceGatewayApiDefinition = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_API_DEFINITION, GATEWAY_API_DEFINITION_CHANNEL, parserGatewayApiDefinition);
+        ReadableDataSource<String, Set<ApiDefinition>> redisDataSourceGatewayApiDefinition = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_API_DEFINITION, GATEWAY_API_DEFINITION_CHANNEL, ConverterUtil.apiDefinitionRuleListParser);
         GatewayApiDefinitionManager.register2Property(redisDataSourceGatewayApiDefinition.getProperty());
 
         // Gateway流控规则
-        Converter<String, Set<GatewayFlowRule>> parserGatewayFlow = source -> JSON.parseObject(source, new TypeReference<Set<GatewayFlowRule>>() {
-        });
-        ReadableDataSource<String, Set<GatewayFlowRule>> redisDataSourceGatewayFlow = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_RULE_FLOW, GATEWAY_RULE_FLOW_CHANNEL, parserGatewayFlow);
+        ReadableDataSource<String, Set<GatewayFlowRule>> redisDataSourceGatewayFlow = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + GATEWAY_RULE_FLOW, GATEWAY_RULE_FLOW_CHANNEL, ConverterUtil.gatewayFlowRuleListParser);
         GatewayRuleManager.register2Property(redisDataSourceGatewayFlow.getProperty());
 
         // 流控规则
-        Converter<String, List<FlowRule>> parserFlow = source -> JSON.parseObject(source, new TypeReference<List<FlowRule>>() {
-        });
-        ReadableDataSource<String, List<FlowRule>> redisDataSourceFlow = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_FLOW, RULE_FLOW_CHANNEL, parserFlow);
+        ReadableDataSource<String, List<FlowRule>> redisDataSourceFlow = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_FLOW, RULE_FLOW_CHANNEL, ConverterUtil.flowRuleListParser);
         FlowRuleManager.register2Property(redisDataSourceFlow.getProperty());
 
         // 降级规则
-        Converter<String, List<DegradeRule>> parserDegrade = source -> JSON.parseObject(source, new TypeReference<List<DegradeRule>>() {
-        });
-        ReadableDataSource<String, List<DegradeRule>> redisDataSourceDegrade = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_DEGRADE, RULE_DEGRADE_CHANNEL, parserDegrade);
+        ReadableDataSource<String, List<DegradeRule>> redisDataSourceDegrade = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_DEGRADE, RULE_DEGRADE_CHANNEL, ConverterUtil.degradeRuleListParser);
         DegradeRuleManager.register2Property(redisDataSourceDegrade.getProperty());
 
         // 热点规则
-        Converter<String, List<ParamFlowRule>> parserParam = source -> JSON.parseObject(source, new TypeReference<List<ParamFlowRule>>() {
-        });
-        ReadableDataSource<String, List<ParamFlowRule>> redisDataSourceParam = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_PARAM, RULE_PARAM_CHANNEL, parserParam);
+        ReadableDataSource<String, List<ParamFlowRule>> redisDataSourceParam = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_PARAM, RULE_PARAM_CHANNEL, ConverterUtil.paramFlowRuleListParser);
         ParamFlowRuleManager.register2Property(redisDataSourceParam.getProperty());
 
         // 系统规则
-        Converter<String, List<SystemRule>> parserSystem = source -> JSON.parseObject(source, new TypeReference<List<SystemRule>>() {
-        });
-        ReadableDataSource<String, List<SystemRule>> redisDataSourceSystem = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_SYSTEM, RULE_SYSTEM_CHANNEL, parserSystem);
+        ReadableDataSource<String, List<SystemRule>> redisDataSourceSystem = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_SYSTEM, RULE_SYSTEM_CHANNEL, ConverterUtil.systemRuleListParser);
         SystemRuleManager.register2Property(redisDataSourceSystem.getProperty());
 
         // 授权规则
-        Converter<String, List<AuthorityRule>> parserAuthority = source -> JSON.parseObject(source, new TypeReference<List<AuthorityRule>>() {
-        });
-        ReadableDataSource<String, List<AuthorityRule>> redisDataSourceAuthority = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_AUTHORITY, RULE_AUTHORITY_CHANNEL, parserAuthority);
+        ReadableDataSource<String, List<AuthorityRule>> redisDataSourceAuthority = new RedisDataSource<>(config, SentinelConfig.getAppName() + ":" + RULE_AUTHORITY, RULE_AUTHORITY_CHANNEL, ConverterUtil.authorityRuleListParser);
         AuthorityRuleManager.register2Property(redisDataSourceAuthority.getProperty());
         log.info(">>>>>>>>>执行sentinel规则初始化 end。。。");
-    }
-
-    private Set<ApiDefinition> parseJson(String data) {
-        Set<ApiDefinition> apiDefinitions = new HashSet<>();
-        JSONArray array = JSON.parseArray(data);
-        for (Object obj : array) {
-            JSONObject o = (JSONObject) obj;
-            ApiDefinition apiDefinition = new ApiDefinition((o.getString("apiName")));
-            Set<ApiPredicateItem> predicateItems = new HashSet<>();
-            JSONArray itemArray = o.getJSONArray("predicateItems");
-            if (itemArray != null) {
-                predicateItems.addAll(itemArray.toJavaList(ApiPathPredicateItem.class));
-            }
-            apiDefinition.setPredicateItems(predicateItems);
-            apiDefinitions.add(apiDefinition);
-        }
-        return apiDefinitions;
     }
 
 }
