@@ -20,7 +20,7 @@ public class ServerResponseUtil {
                 .fluentPut("ip", exchange.getRequest().getRemoteAddress().getAddress().getHostAddress())
                 .fluentPut("data", null)
                 .fluentPut("time", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(LocalDateTime.now()));
-        return ServerResponse.status(HttpStatus.OK)
+        return ServerResponse.status(HttpStatus.TOO_MANY_REQUESTS)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(jsonObject);
     }
